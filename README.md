@@ -4,7 +4,7 @@ This project provides a PowerShell script (`Import.ps1`) to import a custom WSL2
 
 # What Is WSL2?
 
-Windows Subsystem for Linux 2 (WSL2) lets you run a real Linux environment directly on Windows—without the overhead of a full virtual machine. It provides:
+Windows Subsystem for Linux 2 (WSL2) lets you run a real Linux environment directly on Windows without the overhead of a full virtual machine. It provides:
 
 - Native Linux kernel: Faster file system performance and full system call compatibility.
 
@@ -29,7 +29,7 @@ Windows Subsystem for Linux 2 (WSL2) lets you run a real Linux environment direc
 # Import.ps1 Usage Guide
 
 > [!TIP]
-> Once the import finishes, please close this PowerShell window (and any open terminals or File Explorer windows) before checking your WSL distros—otherwise the imported WSL won’t appear.
+> Once the import finishes, please close this PowerShell window (and any open terminals or File Explorer windows) before checking your WSL distros otherwise the imported WSL won’t appear.
 
 ## Prerequisites
 
