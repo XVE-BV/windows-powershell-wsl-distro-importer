@@ -22,7 +22,7 @@ Windows Subsystem for Linux 2 (WSL2) lets you run a real Linux environment direc
 
 > [!IMPORTANT]
 > To leverage these features and enjoy optimized performance, your projects must reside inside the WSL filesystem under an applications folder. Running code from Windows-mounted drives (/mnt/…) is slower and may lead to reduced performance. <br>
-> [Read more about it here](docs/why-run-inside-wsl.md)
+> [Recommended to read more about it here](docs/why-run-inside-wsl.md)
 
 # Import.ps1 Usage Guide
 
