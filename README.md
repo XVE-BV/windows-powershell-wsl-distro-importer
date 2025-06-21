@@ -1,7 +1,35 @@
 # windows-powershell-wsl-distro-importer
+
+# What Is WSL2?
+
+Windows Subsystem for Linux 2 (WSL2) lets you run a real Linux environment directly on Windows—without the overhead of a full virtual machine. It provides:
+
+- Native Linux kernel: Faster file system performance and full system call compatibility.
+
+- Seamless integration: Access Windows files from Linux and vice versa, and use Linux tools alongside Windows apps.
+
+- Lightweight: Lower resource usage compared to traditional VMs.
+
+- This script automates importing a pre-built WSL2 distribution for your development environment.
+
+# Features
+
+- Multiple PHP versions: Choose per-project PHP via environment settings.
+- Latest Composer version: Always have up-to-date dependency management.
+- Nginx support: Generate per-project vhosts automatically using project-root configs.
+- Secure local domains: Serve each project under its own .test domain.
+- Latest Node.js & package managers: Access Node.js, npm, and Yarn globally.
+
+> [!IMPORTANT]
+> To leverage these features and enjoy optimized performance, your projects must reside inside the WSL filesystem under an applications folder. Running code from Windows-mounted drives (/mnt/…) is slower and may lead to reduced performance.
+> Read more about it here
+
 # Import.ps1 Usage Guide
 
 This project provides a PowerShell script (`Import.ps1`) to import a custom WSL2 distro either from the latest GitHub release or from a local tarball.
+
+> [!TIP]
+> Once the import finishes, please close this PowerShell window (and any open terminals or File Explorer windows) before checking your WSL distros—otherwise the imported WSL won’t appear.
 
 ## Prerequisites
 
@@ -101,3 +129,21 @@ For further assistance, please reach out to the dev team or open an issue in the
 **Q:** If the repository is public, can other people upload releases to it without a GitHub token?
 **A:** No. Even for public repositories, uploading a release or attaching assets via the GitHub API requires authentication. Users must have a Personal Access Token (PAT) with the appropriate `repo` scope (or be granted write access via a team membership) and must set `GITHUB_TOKEN` in their environment before running the script.
 
+
+
+# Uninstall (Remove.ps1)
+
+Remove.ps1 is a helper script to completely remove your WSL2 distro. When executed, it:
+
+1. Ensures PowerShell is running as Administrator.
+2. Confirms the specified distro name exists.
+3. Prompts you to confirm the deletion to avoid mistakes.
+4. Stops all WSL instances and unregisters the distro, cleaning up its files.
+5. Displays a final message once removal is complete.
+
+Usage:
+
+```powershell
+.\Remove.ps1 [-DistroName YourDistroName]
+```
+If you omit -DistroName, it defaults to XVE. Always back up any important data before running removal.
