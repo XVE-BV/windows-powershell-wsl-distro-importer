@@ -1,4 +1,4 @@
-# windows-powershell-wsl-distro-importer
+# windows 11 Powershell WSL2 Distro Importer
 
 This project provides a PowerShell script (`Import.ps1`) to import a custom WSL2 distro either from the latest GitHub release or from a local tarball.
 
