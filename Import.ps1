@@ -34,7 +34,7 @@ Push-Location $scriptDir
 
 if (-not $Local) {
     # Download from GitHub, handling “no releases yet” as a 404
-    $repo      = 'your-org/xve-artifacts'   # ← replace with your actual owner/repo
+    $repo      = 'jonasvanderhaegen-xve/xve-artifacts'   # ← replace with your actual owner/repo
     $assetName = 'xve-distro.tar'
 
     Write-Host "Fetching latest release from GitHub repo '$repo'…"
