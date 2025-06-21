@@ -1,4 +1,4 @@
-<## Remove.ps1 ##>
+# Remove.ps1
 <#
 .SYNOPSIS
   Unregister (remove) a WSL2 distro by name.
@@ -10,16 +10,23 @@ param(
 )
 
 # Ensure running as Administrator
-If (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator')) {
+if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator')) {
     Write-Warning 'Please run this script as Administrator.'
-    Exit 1
+    exit 1
 }
 
 # Check if distro exists
-$distroList = wsl -l -q
-If ($distroList -notcontains $DistroName) {
+$distroList = wsl --list --quiet
+if ($distroList -notcontains $DistroName) {
     Write-Warning "Distro '$DistroName' is not registered."
-    Exit 1
+    exit 1
+}
+
+# Prompt for confirmation
+$confirm = Read-Host "Are you sure you want to unregister and delete distro '$DistroName'? (y/N)"
+if ($confirm -notin 'y','Y') {
+    Write-Host 'Operation cancelled.'
+    exit 0
 }
 
 # Shutdown and unregister
