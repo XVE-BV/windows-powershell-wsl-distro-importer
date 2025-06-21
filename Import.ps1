@@ -1,59 +1,100 @@
 <#
 .SYNOPSIS
-  Scripts to Import and Unregister a custom WSL2 distro.
-#>
-
-<#
-.SYNOPSIS
-  Import a custom WSL2 distro from a tarball.
+  Import or re-import a custom WSL2 distro from a tarball or GitHub release.
 .DESCRIPTION
-  Shuts down WSL, creates the target folder, and imports the distro.
+  By default, fetches the latest GitHub release asset (xve-distro.tar)  
+  from your artifacts repo and saves it next to this script.  
+  If you pass `-Local`, it skips the download and uses the local `-TarballPath`.
 .PARAMETER DistroName
-  Name to register under WSL (default: nginx-wsl).
+  Name to register under WSL (default: XVE).
 .PARAMETER InstallDir
-  Windows path to install the distro's filesystem data (default: $env:USERPROFILE\\WSL\\nginx-wsl).
+  Windows path to install the distro's filesystem data (default: $env:USERPROFILE\WSL\XVE).
 .PARAMETER TarballPath
-  Path to the exported tarball (default: .\\xve-distro.tar).
+  When `-Local` is used, path to the local tarball. Defaults to ".\xve-distro.tar".
+.PARAMETER Local
+  Switch: if present, skip GitHub download and import directly from `-TarballPath`.
 #>
+[CmdletBinding()]
 param(
-    [string]$DistroName   = 'XVE',
-    [string]$InstallDir   = "$env:USERPROFILE\WSL\XVE",
-    [string]$TarballPath  = ".\xve-distro.tar"
+    [string]$DistroName  = 'XVE',
+    [string]$InstallDir  = "$env:USERPROFILE\WSL\XVE",
+    [string]$TarballPath = ".\xve-distro.tar",
+    [switch]$Local
 )
 
 # Ensure running as Administrator
-If (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator')) {
+if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator')) {
     Write-Warning 'Please run this script as Administrator.'
-    Exit 1
+    exit 1
 }
 
-# Check if distro already exists
-$existingDistros = wsl --list --quiet
-if ($existingDistros -contains $DistroName) {
-    Write-Warning "Distro '$DistroName' already exists. Do you want to replace it? (y/N)"
-    $response = Read-Host
-    if ($response -ne 'y' -and $response -ne 'Y') {
-        Write-Host "Import cancelled."
-        Exit 0
+# Determine script folder
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
+Push-Location $scriptDir
+
+if (-not $Local) {
+    # Download from GitHub
+    $repo      = 'jonasvanderhaegen-xve/xve-artifacts'      # replace with your actual owner/repo
+    $assetName = 'xve-distro.tar'
+    Write-Host "Fetching latest release from GitHub repo '$repo'…"
+    try {
+        $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$repo/releases/latest" -UseBasicParsing -ErrorAction Stop
+    } catch {
+        Write-Error "Failed to fetch latest release metadata: $_"
+        exit 1
     }
-    Write-Host "Unregistering existing distro..."
+
+    $asset = $release.assets | Where-Object { $_.name -eq $assetName }
+    if (-not $asset) {
+        Write-Error "Release does not contain asset '$assetName'."
+        exit 1
+    }
+
+    $downloadUrl = $asset.browser_download_url
+    $destPath    = Join-Path $scriptDir $assetName
+    Write-Host "Downloading '$assetName' to '$destPath'…"
+    try {
+        Invoke-WebRequest -Uri $downloadUrl -OutFile $destPath -UseBasicParsing -ErrorAction Stop `
+            -Headers @{ 'User-Agent' = 'XVE-Importer' }
+    } catch {
+        Write-Error "Download failed: $_"
+        exit 1
+    }
+
+    $TarballPath = $destPath
+} else {
+    # Use a local tarball
+    if (-not (Test-Path $TarballPath)) {
+        Write-Error "Local tarball '$TarballPath' not found."
+        exit 1
+    }
+    Write-Host "Using local tarball: $TarballPath"
+}
+
+# Unregister existing distro if present
+$existing = wsl --list --quiet
+if ($existing -contains $DistroName) {
+    Write-Warning "Distro '$DistroName' already exists. Replace? (y/N)"
+    $ans = Read-Host
+    if ($ans -notin 'y','Y') {
+        Write-Host "Import cancelled."
+        exit 0
+    }
+    Write-Host "Unregistering existing distro…"
     wsl --unregister $DistroName
 }
 
-# Shutdown any running WSL instances
-Write-Host "Stopping all WSL distros..."
+# Shutdown WSL
+Write-Host "Stopping all WSL distros…"
 wsl --shutdown
 
-# Validate tarball exists
-If (-not (Test-Path -Path $TarballPath)) {
-    Write-Error "Tarball '$TarballPath' not found."
-    Exit 1
-}
-
-# Create installation directory
-Write-Host "Creating install directory: $InstallDir"
+# Prepare install directory
+Write-Host "Ensuring install directory: $InstallDir"
 New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
 
 # Import the distro
-Write-Host "Importing WSL distro '$DistroName'..."
+Write-Host "Importing WSL distro '$DistroName' from '$TarballPath'…"
 wsl --import $DistroName $InstallDir $TarballPath --version 2
+
+Write-Host "`nDone! You can now run: wsl -d $DistroName"
+Pop-Location
