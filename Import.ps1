@@ -33,15 +33,26 @@ $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
 Push-Location $scriptDir
 
 if (-not $Local) {
-    # Download from GitHub
-    $repo      = 'jonasvanderhaegen-xve/xve-artifacts'      # replace with your actual owner/repo
+    # Download from GitHub, handling “no releases yet” as a 404
+    $repo      = 'your-org/xve-artifacts'   # ← replace with your actual owner/repo
     $assetName = 'xve-distro.tar'
+
     Write-Host "Fetching latest release from GitHub repo '$repo'…"
     try {
-        $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$repo/releases/latest" -UseBasicParsing -ErrorAction Stop
-    } catch {
-        Write-Error "Failed to fetch latest release metadata: $_"
-        exit 1
+        $release = Invoke-RestMethod `
+            -Uri "https://api.github.com/repos/$repo/releases/latest" `
+            -UseBasicParsing -ErrorAction Stop
+    }
+    catch {
+        if ($_.Exception.Response.StatusCode -eq 404) {
+            Write-Warning "No releases found in '$repo'."
+            Write-Host  "Publish a release on GitHub or rerun with -Local to use a local tarball."
+            exit 1
+        }
+        else {
+            Write-Error "Error fetching release metadata: $_"
+            exit 1
+        }
     }
 
     $asset = $release.assets | Where-Object { $_.name -eq $assetName }
@@ -54,15 +65,21 @@ if (-not $Local) {
     $destPath    = Join-Path $scriptDir $assetName
     Write-Host "Downloading '$assetName' to '$destPath'…"
     try {
-        Invoke-WebRequest -Uri $downloadUrl -OutFile $destPath -UseBasicParsing -ErrorAction Stop `
-            -Headers @{ 'User-Agent' = 'XVE-Importer' }
-    } catch {
+        Invoke-WebRequest `
+            -Uri $downloadUrl `
+            -OutFile $destPath `
+            -UseBasicParsing `
+            -Headers @{ 'User-Agent' = 'XVE-Importer' } `
+            -ErrorAction Stop
+    }
+    catch {
         Write-Error "Download failed: $_"
         exit 1
     }
 
     $TarballPath = $destPath
-} else {
+}
+else {
     # Use a local tarball
     if (-not (Test-Path $TarballPath)) {
         Write-Error "Local tarball '$TarballPath' not found."
