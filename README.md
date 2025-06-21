@@ -53,6 +53,7 @@ Windows Subsystem for Linux 2 (WSL2) lets you run a real Linux environment direc
 | `-InstallDir`  | `string` | `$env:USERPROFILE\WSL\XVE` | Windows folder where the distro filesystem will be created/imported.            |
 | `-TarballPath` | `string` | `\.\xve-distro.tar`        | Path to local tarball when using `-Local`.                                      |
 | `-Local`       | `switch` | N/A                        | When present, **skip** GitHub download and import directly from `-TarballPath`. |
+| `-Token`       | `switch` | N/A                        | When present, it authorizes with your environment variable `GITHUB_TOKEN`  to access your private repository where the artifacts are released. |
 
 ## Environment Variables
 
