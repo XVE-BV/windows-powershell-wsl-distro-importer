@@ -1,150 +1,214 @@
-# windows 11 Powershell WSL2 Distro Importer
+**TLDR:**
 
-This project provides a PowerShell script (`Import.ps1`) to import a custom WSL2 distro either from the latest GitHub release or from a local tarball.
+1. Clone this repository locally.
+2. Run `.\install.ps1` from an **Administrator** PowerShell prompt. (write "i" and press tab for autocompletion)
+3. Close all PowerShell, terminal, and File Explorer windows.
+4. In Docker Desktop → Settings → Resources → WSL Integration, enable integration for your imported `XVEDistro`.
 
-# What Is WSL2?
+**Test your setup:**
 
-Windows Subsystem for Linux 2 (WSL2) lets you run a real Linux environment directly on Windows without the overhead of a full virtual machine. It provides:
+* Launch the `XVEDistro` distro via WSL.
+* Inside the distro shell, run:
 
-- Native Linux kernel: Faster file system performance and full system call compatibility.
+  ```sh
+  git clone https://github.com/jonasvanderhaegen/laravel-boilerplate.git
+  ```
+* Open your IDE on `~/apps/laravel-boilerplate` and start another XVE shell.
+* In the project folder, execute:
 
-- Seamless integration: Access Windows files from Linux and vice versa, and use Linux tools alongside Windows apps.
+  ```sh
+  ./scripts/sail.sh
+  ```
 
-- Lightweight: Lower resource usage compared to traditional VMs.
-
-- This script automates importing a pre-built WSL2 distribution for your development environment.
-
-# Features
-
-- Multiple PHP versions: Choose per-project PHP via environment settings.
-- Latest Composer version: Always have up-to-date dependency management.
-- Nginx support: Generate per-project vhosts automatically using project-root configs.
-- Secure local domains: Serve each project under its own .test domain.
-- Latest Node.js & package managers: Access Node.js, npm, and Yarn globally.
-
-> [!IMPORTANT]
-> To leverage these features and enjoy optimized performance, your projects must reside inside the WSL filesystem under an applications folder. Running code from Windows-mounted drives (/mnt/…) is slower and may lead to reduced performance. <br>
-> [Recommended to read more about it here](docs/why-run-inside-wsl.md)
-
-# Import.ps1 Usage Guide
-
-> [!TIP]
-> Once the import finishes, please close this PowerShell window (and any open terminals or File Explorer windows) before checking your WSL distros otherwise the imported WSL won’t appear.
-
-## Prerequisites
-
-* **Windows PowerShell** (run as Administrator)
-* **WSL2** enabled on Windows
-* **`Import.ps1`** located in your project root
-* **Optional**: A GitHub Personal Access Token (PAT) in `GITHUB_TOKEN` env var if your artifacts repo is private
+  Accept prompts and wait for setup to complete.
+* Run `sr` (alias for `sail composer run dev`).
+* Visit `http://laravel.test` in your browser.
 
 ---
 
-## Script Features
+<a href="https://github.com/users/jonasvanderhaegen-xve/projects/1">View Project Kanban Board</a>
 
-* **Default behavior**: Downloads the **latest** `xve-distro.tar` from your GitHub artifacts repo and imports it.
-* **Local import**: Use the `-Local` switch to skip GitHub and use a local tarball (`-TarballPath`).
+---
 
-## Parameters
+# Windows 11 WSL2 Distro Importer (PowerShell)
 
-| Parameter      | Type     | Default                    | Description                                                                     |
-| -------------- | -------- | -------------------------- | ------------------------------------------------------------------------------- |
-| `-DistroName`  | `string` | `XVE`                      | Name under which the distro will be registered in WSL.                          |
-| `-InstallDir`  | `string` | `$env:USERPROFILE\WSL\XVE` | Windows folder where the distro filesystem will be created/imported.            |
-| `-TarballPath` | `string` | `\.\xve-distro.tar`        | Path to local tarball when using `-Local`.                                      |
-| `-Local`       | `switch` | N/A                        | When present, **skip** GitHub download and import directly from `-TarballPath`. |
-| `-Token`       | `switch` | N/A                        | When present, it authorizes with your environment variable `GITHUB_TOKEN`  to access your private repository where the artifacts are released. |
+Import a pre-built WSL2 distro into your Windows environment with a single PowerShell script. Ideal for bringing up a consistent development setup with zero manual configuration.
 
-## Environment Variables
+## What Is This?
 
-* **`GITHUB_TOKEN`** (optional): A PAT with `repo` scope, required if your artifacts repo is **private**.
+`install.ps1` automates:
 
-  ### Setting `GITHUB_TOKEN` in Windows PowerShell
+1. **Downloading** the latest or specified `xve-distro.tar` from GitHub Releases (public or private).
+2. **Importing** that tarball into WSL2 under a custom distro name.
+3. **Registering** it so you can launch your new Linux environment immediately.
 
-  You can set your PAT as a user environment variable so it persists across sessions:
+## Why Use It?
 
-  ```powershell
-  # Replace <YOUR_TOKEN> with your actual PAT
-  [Environment]::SetEnvironmentVariable(
-    'GITHUB_TOKEN',               # variable name
-    '<YOUR_TOKEN>',               # PAT value
-    'User'                        # scope: User, Machine, or Process
-  )
+* **Consistency**: Everyone on the team runs the identical base distro.
+* **Simplicity**: One script, no manual WSL commands to remember.
+* **Flexibility**: Import from GitHub or use a local tarball.
 
-  # Restart PowerShell or run this to load the new variable:
-  $Env:GITHUB_TOKEN = [Environment]::GetEnvironmentVariable('GITHUB_TOKEN','User')
+---
+
+## Prerequisites
+
+* **Windows PowerShell** (start as Administrator)
+* **WSL2** enabled on Windows 11
+* **Docker Desktop** (to build the distro, if generating locally)
+* **Optional**: `GITHUB_TOKEN` env var with `repo` scope for private repo access
+
+---
+
+## Usage
+
+### Import the Latest Release from GitHub
+
+```powershell
+# In the folder containing install.ps1:
+
+#This is enough really. type "i", then press tab and enter.
+.\install.ps1
+
+# (optional) For other distro
+.\install.ps1 -DistroName XVE -InstallDir "$env:USERPROFILE\WSL\XVE"
+```
+
+* Downloads the most recent `xve-distro.tar` published on your GitHub artifacts repo.
+* Imports as WSL distro named `XVE` at `C:\Users\You\WSL\XVE`.
+
+### Import from a Local Tarball
+
+```powershell
+.\install.ps1 -Local -TarballPath ".\xve-distro.tar" -DistroName XVE
+```
+
+* Skips GitHub download and uses the specified local tarball.
+
+### Available Parameters
+
+> **Shell Experience**: The importer configures the default login shell as **Zsh**, providing a richer prompt, auto-completion, and the preconfigured aliases out of the box.
+
+### Available Parameters
+
+| Parameter      | Type   | Default                    | Description                                                  |
+| -------------- | ------ | -------------------------- | ------------------------------------------------------------ |
+| `-DistroName`  | string | `XVE`                      | The WSL distro name to register.                             |
+| `-InstallDir`  | string | `$env:USERPROFILE\WSL\XVE` | Filesystem path for the imported distro.                     |
+| `-Local`       | switch | (not set)                  | If present, import from `-TarballPath` instead of GitHub.    |
+| `-TarballPath` | string | `.\xve-distro.tar`         | Path to the local tarball when using `-Local`.               |
+| `-Token`       | switch | (not set)                  | Use `GITHUB_TOKEN` env var to authenticate GitHub API calls. |
+
+---
+
+## How It Works
+
+1. **Fetch**: If `-Local` is not used, the script calls GitHub API to locate the latest release and downloads its tarball.
+2. **WSL Import**: Runs `wsl --import` to register a new WSL2 distro with the tarball contents.
+3. **Clean Up**: Removes any temporary files and confirms the new distro is available via `wsl -l -v`.
+
+---
+
+## Preconfigured Shell Aliases
+
+When you launch the imported distro, several helpful aliases and functions are already available in your Zsh environment via `~/.zshrc`. These include:
+
+* `sail()` – A wrapper function for Laravel Sail:
+
+  ```sh
+  sail() {
+    if [[ -f vendor/bin/sail ]]; then
+      zsh vendor/bin/sail "$@"
+    else
+      echo "vendor/bin/sail not found"
+    fi
+  }
   ```
 
-## Examples
+  Use it to run Sail without typing `vendor/bin/sail`.
 
-### 1. Import latest from GitHub (public repo)
+* `s`  – Short alias for `sail ` (appends a space):
 
-```powershell
-.\Import.ps1
-```
+  ```sh
+  alias s='sail '
+  ```
 
-### 2. Import latest from GitHub (private repo)
+  So you can do:
 
-```powershell
-# Set PAT in session
-$Env:GITHUB_TOKEN = '<your_token_here>'
+  ```sh
+  s up -d        # equivalent to sail up -d
+  s down         # equivalent to sail down
+  ```
 
-# Run import
-.\Import.ps1
-```
+* `sa` – Shortcut for `sail artisan `:
 
-### 3. Import from local tarball
+  ```sh
+  alias sa='sail artisan '
+  ```
 
-```powershell
-.\Import.ps1 -Local
-```
+  Run Artisan commands quickly:
 
-### 4. Import from custom local path
+  ```sh
+  sa migrate     # runs php artisan migrate
+  sa tinker      # runs php artisan tinker
+  ```
 
-```powershell
-.\Import.ps1 -Local -TarballPath '.\build\custom-xve.tar'
-```
+* `sc` – Shortcut for `sail composer `:
+
+  ```sh
+  alias sc='sail composer '
+  ```
+
+  Manage Composer dependencies inside Sail:
+
+  ```sh
+  sc install     # runs composer install
+  sc update      # runs composer update
+  ```
+
+* Database migration shortcuts:
+
+  ```sh
+  alias sm='sa migrate'
+  alias smf='sa migrate:fresh'
+  alias smfs='sa migrate:fresh --seed'
+  ```
+
+  Quickly migrate or refresh+seed your database.
+
+---
+
+## Docker WSL Integration
+
+After importing your new WSL distro, Docker Desktop does not automatically allow it to access the Docker daemon. To enable Docker CLI commands inside your distro, follow these steps:
+
+1. Open **Docker Desktop** on Windows.
+2. Go to **Settings** (gear icon) → **Resources** → **WSL Integration**.
+3. Find your imported distro (e.g. `XVEDistro`) in the list and **toggle its switch to “on”**.
+4. Click **Apply & Restart**.
+
+This step mounts the Docker Desktop daemon’s socket (`/var/run/docker.sock`) into your WSL2 distro, so commands like `docker ps`, `docker compose up`, and Laravel Sail will work seamlessly without installing a separate Docker Engine inside WSL.
 
 ---
 
 ## Troubleshooting
 
-* **404 when fetching releases**: Ensure:
-
-  * The repo string (`owner/repo`) in the script matches exactly.
-  * The GitHub release is **published** (not a draft).
-  * For private repos, `GITHUB_TOKEN` is set and has `repo` scope.
-
-* **Permission errors**: Verify you’re running PowerShell **as Administrator**.
-
-* **WSL import issues**: Make sure WSL2 is enabled and you have sufficient disk space in the target `InstallDir`.
+* **404 Errors Fetching Releases**: Verify the GitHub repo slug in the script matches your artifacts repo and that the latest release is published (not draft).
+* **Authentication Failures**: Ensure `GITHUB_TOKEN` is set and has `repo` scope for private repos.
+* **WSL Import Fails**: Confirm WSL2 feature is enabled (`wsl --list --online`) and you have write access to `-InstallDir`.
+* **Script Requires Admin**: Always run PowerShell as Administrator, or `wsl --shutdown` may fail.
 
 ---
 
-For further assistance, please reach out to the dev team or open an issue in the artifacts repository.
+## Uninstalling a Distro
 
----
-
-## FAQ
-
-**Q:** If the repository is public, can other people upload releases to it without a GitHub token?
-**A:** No. Even for public repositories, uploading a release or attaching assets via the GitHub API requires authentication. Users must have a Personal Access Token (PAT) with the appropriate `repo` scope (or be granted write access via a team membership) and must set `GITHUB_TOKEN` in their environment before running the script.
-
-
-
-# Uninstall (Remove.ps1)
-
-Remove.ps1 is a helper script to completely remove your WSL2 distro. When executed, it:
-
-1. Ensures PowerShell is running as Administrator.
-2. Confirms the specified distro name exists.
-3. Prompts you to confirm the deletion to avoid mistakes.
-4. Stops all WSL instances and unregisters the distro, cleaning up its files.
-5. Displays a final message once removal is complete.
-
-Usage:
+Use the companion `uninstall.ps1` script to unregister and clean up a WSL2 distro:
 
 ```powershell
-.\Remove.ps1 [-DistroName YourDistroName]
+.\uninstall.ps1 -DistroName XVE
 ```
-If you omit -DistroName, it defaults to XVE. Always back up any important data before running removal.
+
+This will stop all WSL instances for that distro and remove its filesystem.
+
+---
+
+*Maintain a consistent developer experience with a single import command.*
