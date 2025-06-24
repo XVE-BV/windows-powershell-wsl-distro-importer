@@ -92,17 +92,20 @@ Pop-Location
 
 # --- Enable Docker Desktop WSL Integration for XVE ---
 $roaming = Join-Path $Env:APPDATA 'Docker'
-$paths = @(Join-Path $roaming 'settings.json', Join-Path $roaming 'settings-store.json')
+# Build array of possible settings file paths
+$paths = @(
+    Join-Path $roaming 'settings.json';
+    Join-Path $roaming 'settings-store.json'
+)
 $settingsPath = $paths | Where-Object { Test-Path $_ } | Select-Object -First 1
 if (-not $settingsPath) {
     Write-Warning "Docker Desktop settings not found at expected locations:`n  $($paths -join '`n  ')"
     return
 }
 
-# Load file and strip JSON comments
+# Load file and strip comments
 try {
     $raw = Get-Content $settingsPath -Raw
-    # remove // comments and /* */ blocks
     $clean = $raw -replace '(?m)//.*$','' -replace '(?s)/\*.*?\*/',''
     $json = $clean | ConvertFrom-Json
 } catch {
@@ -115,32 +118,31 @@ try {
     }
 }
 
-# Ensure WSL integration is enabled globally
+# Enable integration
 $json.wslEngineEnabled = $true
 
-# Determine list key for distros
+# Determine list key
 if ($json.PSObject.Properties.Name -contains 'wslDistros') {
     $listKey = 'wslDistros'
 } elseif ($json.PSObject.Properties.Name -contains 'enabledWSLDistros') {
     $listKey = 'enabledWSLDistros'
 } else {
-    Write-Warning "Could not find expected WSL-integration list key in $settingsPath"
+    Write-Warning "Could not find expected list key in $settingsPath"
     return
 }
 
-# Add distro if not present
+# Add distro
 $existing = @($json.$listKey)
 if ($existing -notcontains $DistroName) {
     $existing += $DistroName
     $json.$listKey = $existing
-    # Write updated settings
     $json | ConvertTo-Json -Depth 10 | Set-Content $settingsPath -Encoding UTF8
-    Write-Host "✅ Added '$DistroName' to Docker Desktop WSL integration list in $([IO.Path]::GetFileName($settingsPath))."
+    Write-Host "✅ Added '$DistroName' to Docker Desktop WSL integration in $(Split-Path $settingsPath -Leaf)."
 } else {
-    Write-Host "'$DistroName' already present in Docker Desktop WSL integration list."
+    Write-Host "'$DistroName' already in integration list."
 }
 
-# Restart Docker Desktop to apply changes
+# Restart Docker Desktop
 Write-Host "🔄 Restarting Docker Desktop..."
 Get-Process -Name 'Docker Desktop' -ErrorAction SilentlyContinue | Stop-Process -Force
 Start-Process -FilePath 'C:\Program Files\Docker\Docker\Docker Desktop.exe' -ErrorAction SilentlyContinue
