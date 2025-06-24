@@ -59,6 +59,11 @@ if (-not $Local) {
 # Import the distro
 Write-Host "Importing WSL distro '$DistroName'..."
 wsl --import $DistroName $InstallDir $TarballPath --version 2
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "WSL import failed with code $LASTEXITCODE. Aborting integration setup."
+    Pop-Location
+    exit 1
+}
 Write-Host "Registered distro '$DistroName'."
 Pop-Location
 
