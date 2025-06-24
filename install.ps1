@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  Import or re-import a custom WSL2 distro from a tarball or GitHub release.
+  Import or re-import a custom WSL2 distro from a tarball or GitHub release, and enable Docker Desktop WSL integration.
 .DESCRIPTION
   By default, fetches the latest GitHub release asset (xve-distro.tar) from your artifacts repo and saves it next to this script.
   If you pass `-Local`, it skips the download and uses the local `-TarballPath`.
@@ -86,19 +86,29 @@ if (-not $Local) {
 # Import the distro
 Write-Host "Importing WSL distro '$DistroName' from '$TarballPath'…"
 wsl --import $DistroName $InstallDir $TarballPath --version 2
+Write-Host "Distro '$DistroName' has been registered."
 
-Write-Host "`nDone! You can now run: wsl -d $DistroName"
 Pop-Location
 
 # --- Enable Docker Desktop WSL Integration for XVE ---
-# Path to Docker Desktop settings
-$settingsPath = Join-Path $Env:APPDATA "Docker\settings.json"
+# Attempt to locate Docker Desktop settings
+$roaming = Join-Path $Env:APPDATA 'Docker'
+$paths = @(
+    Join-Path $roaming 'settings.json',
+    Join-Path $roaming 'settings-store.json'
+)
+$settingsPath = $paths | Where-Object { Test-Path $_ } | Select-Object -First 1
+if (-not $settingsPath) {
+    Write-Warning "Could not find Docker Desktop settings at expected locations:`n  $($paths -join '`n  ')"
+    return
+}
 
-# Load & parse settings.json
-if (Test-Path $settingsPath) {
+# Load & parse settings
+Try {
     $json = Get-Content $settingsPath -Raw | ConvertFrom-Json
-} else {
-    Throw "Could not find Docker Desktop settings at $settingsPath"
+} Catch {
+    Write-Warning "Failed to parse JSON from $settingsPath: $_"
+    return
 }
 
 # Ensure WSL integration is enabled globally
@@ -110,22 +120,23 @@ if ($json.PSObject.Properties.Name -contains 'wslDistros') {
 } elseif ($json.PSObject.Properties.Name -contains 'enabledWSLDistros') {
     $listKey = 'enabledWSLDistros'
 } else {
-    Throw "Could not find expected WSL-integration list key in settings.json"
+    Write-Warning "Could not find expected WSL-integration list key in $settingsPath"
+    return
 }
 
-# Add XVE if not present
-$distros = @($json.$listKey)
-if ($distros -notcontains $DistroName) {
-    $distros += $DistroName
-    $json.$listKey = $distros
+# Add distro if not present
+$existing = @($json.$listKey)
+if ($existing -notcontains $DistroName) {
+    $existing += $DistroName
+    $json.$listKey = $existing
     # Write updated settings
     $json | ConvertTo-Json -Depth 10 | Set-Content $settingsPath -Encoding UTF8
-    Write-Host "✅ Added '$DistroName' to Docker Desktop WSL integration list."
+    Write-Host "✅ Added '$DistroName' to Docker Desktop WSL integration list in $([IO.Path]::GetFileName($settingsPath))."
 } else {
-    Write-Host "'$DistroName' already present in Docker Desktop WSL integration."
+    Write-Host "'$DistroName' already present in Docker Desktop WSL integration list."
 }
 
 # Restart Docker Desktop to apply changes
 Write-Host "🔄 Restarting Docker Desktop..."
-Get-Process -Name "Docker Desktop" -ErrorAction SilentlyContinue | Stop-Process -Force
-Start-Process -FilePath "C:\Program Files\Docker\Docker\Docker Desktop.exe"
+Get-Process -Name 'Docker Desktop' -ErrorAction SilentlyContinue | Stop-Process -Force
+Start-Process -FilePath 'C:\Program Files\Docker\Docker\Docker Desktop.exe' -ErrorAction SilentlyContinue
