@@ -35,121 +35,81 @@ $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
 Push-Location $scriptDir
 
 if (-not $Local) {
-    # Download latest release from GitHub (requires a PAT if private)
+    # Download latest release from GitHub
     $repo      = 'jonasvanderhaegen-xve/xve-artifacts'
     $assetName = 'xve-distro.tar'
     Write-Host "Fetching latest release from GitHub repo '$repo'..."
-
     $headers = @{ 'User-Agent' = 'XVE-Importer' }
     if ($Token) {
         $ghToken = $Env:GITHUB_TOKEN
-        if (-not $ghToken) {
-            Write-Error "-UseToken specified but GITHUB_TOKEN not set; cannot authenticate."
-            exit 1
-        }
+        if (-not $ghToken) { Write-Error "-UseToken specified but GITHUB_TOKEN not set."; exit 1 }
         $headers.Authorization = "token $ghToken"
     }
-
-    try {
-        $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$repo/releases/latest" -UseBasicParsing -Headers $headers -ErrorAction Stop
-    } catch {
-        Write-Error "Failed to fetch latest release: $($_.Exception.Response.Content)"
-        exit 1
-    }
-
+    try { $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$repo/releases/latest" -UseBasicParsing -Headers $headers -ErrorAction Stop } catch { Write-Error "Failed fetching latest release."; exit 1 }
     $asset = $release.assets | Where-Object { $_.name -eq $assetName }
-    if (-not $asset) {
-        Write-Error "Latest release does not contain asset '$assetName'."
-        exit 1
-    }
-
-    $downloadUrl = $asset.browser_download_url
-    $destPath    = Join-Path $scriptDir $assetName
-    Write-Host "Downloading '$assetName' to '$destPath'..."
-    try {
-        Invoke-WebRequest -Uri $downloadUrl -OutFile $destPath -UseBasicParsing -Headers $headers -ErrorAction Stop
-    } catch {
-        Write-Error "Download failed: $_"
-        exit 1
-    }
-
-    $TarballPath = $destPath
+    if (-not $asset) { Write-Error "Asset '$assetName' not found."; exit 1 }
+    $dest = Join-Path $scriptDir $assetName
+    Write-Host "Downloading to '$dest'..."; Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $dest -UseBasicParsing -Headers $headers
+    $TarballPath = $dest
 } else {
-    # Use a local tarball
-    if (-not (Test-Path $TarballPath)) {
-        Write-Error "Local tarball '$TarballPath' not found."
-        exit 1
-    }
+    if (-not (Test-Path $TarballPath)) { Write-Error "Local tarball '$TarballPath' not found."; exit 1 }
     Write-Host "Using local tarball: $TarballPath"
 }
 
 # Import the distro
-Write-Host "Importing WSL distro '$DistroName' from '$TarballPath'…"
+Write-Host "Importing WSL distro '$DistroName'..."
 wsl --import $DistroName $InstallDir $TarballPath --version 2
-Write-Host "Distro '$DistroName' has been registered."
-
+Write-Host "Registered distro '$DistroName'."
 Pop-Location
 
-# --- Enable Docker Desktop WSL Integration for XVE ---
-$roaming = Join-Path $Env:APPDATA 'Docker'
-$paths = @(
-    Join-Path $roaming 'settings.json';
-    Join-Path $roaming 'settings-store.json'
-)
-$settingsPath = $paths | Where-Object { Test-Path $_ } | Select-Object -First 1
-if (-not $settingsPath) {
-    Write-Warning "Docker Desktop settings not found at expected locations:`n  $($paths -join '`n  ')"
-    return
-}
+# --- Enable Docker Desktop WSL Integration ---
+$base = Join-Path $Env:APPDATA 'Docker'
+$files = @(Join-Path $base 'settings.json'; Join-Path $base 'settings-store.json')
+$configFile = $files | Where-Object { Test-Path $_ } | Select-Object -First 1
+if (-not $configFile) { Write-Warning "No Docker settings file found."; return }
 
-# Load file and strip comments
-try {
-    $raw = Get-Content $settingsPath -Raw
-    $clean = $raw -replace '(?m)//.*$','' -replace '(?s)/\*.*?\*/',''
-    $json = $clean | ConvertFrom-Json
-} catch {
-    Write-Warning "Could not parse JSON from $settingsPath. Attempting lenient load."
-    try {
-        $json = Get-Content $settingsPath -Raw | ConvertFrom-Json -ErrorAction Stop
-    } catch {
-        Write-Warning "Failed to load settings JSON. Skipping integration enable."
-        return
-    }
-}
+# Load and clean JSON
+$raw = Get-Content $configFile -Raw
+$clean = $raw -replace '(?m)//.*$','' -replace '(?s)/\*.*?\*/',''
+try { $cfg = $clean | ConvertFrom-Json } catch { Write-Warning "Invalid JSON in $configFile."; return }
 
-# Enable integration key if present
-if ($json.PSObject.Properties.Name -contains 'wslEngineEnabled') {
-    $json.wslEngineEnabled = $true
-    Write-Host "Set 'wslEngineEnabled' = true"
-} elseif ($json.PSObject.Properties.Name -contains 'wslEngineSettings') {
-    $json.wslEngineSettings.enabled = \$true
-    Write-Host "Set 'wslEngineSettings.enabled' = true"
+# Handle known integration structures
+if ($cfg.PSObject.Properties.Name -contains 'wslEngineEnabled') {
+    $cfg.wslEngineEnabled = $true
+    Write-Host "Enabled WSL engine via 'wslEngineEnabled'."
+    $list = 'wslDistros'
+} elseif ($cfg.PSObject.Properties.Name -contains 'wslEngineSettings') {
+    $cfg.wslEngineSettings.enabled = $true
+    Write-Host "Enabled WSL engine via 'wslEngineSettings.enabled'."
+    $list = 'wslDistros'
+} elseif ($cfg.PSObject.Properties.Name -contains 'wslIntegration') {
+    $cfg.wslIntegration.enabled = $true
+    Write-Host "Enabled WSL integration via 'wslIntegration'."
+    $list = 'distros'
+    # nested under wslIntegration
+    if ($cfg.wslIntegration.distros -notcontains $DistroName) { $cfg.wslIntegration.distros += $DistroName }
+    Write-Host "Added '$DistroName' to wslIntegration.distros."
+    # Save and exit
+    $cfg | ConvertTo-Json -Depth 10 | Set-Content $configFile -Encoding UTF8
+    goto RestartDocker
 } else {
-    Write-Warning "WSL integration enable key not found in $settingsPath"
+    Write-Warning "Unknown integration config in $configFile."; return
 }
 
-# Determine list key
-if ($json.PSObject.Properties.Name -contains 'wslDistros') {
-    $listKey = 'wslDistros'
-} elseif ($json.PSObject.Properties.Name -contains 'enabledWSLDistros') {
-    $listKey = 'enabledWSLDistros'
+# Update distro list for earlier structures
+if ($list -and $cfg.PSObject.Properties.Name -contains $list) {
+    $arr = @($cfg.$list)
+    if ($arr -notcontains $DistroName) { $arr += $DistroName; $cfg.$list = $arr; Write-Host "Added '$DistroName' to '$list'." }
+    else { Write-Host "'$DistroName' already present in '$list'." }
 } else {
-    Write-Warning "Could not find expected list key in $settingsPath"
-    return
+    Write-Warning "Could not find list '$list' in $configFile."; return
 }
 
-# Add distro to list
-$existing = @($json.$listKey)
-if ($existing -notcontains $DistroName) {
-    $existing += $DistroName
-    $json.$listKey = $existing
-    $json | ConvertTo-Json -Depth 10 | Set-Content $settingsPath -Encoding UTF8
-    Write-Host "✅ Added '$DistroName' to Docker Desktop WSL integration in $(Split-Path $settingsPath -Leaf)."
-} else {
-    Write-Host "'$DistroName' already in integration list."
-}
+# Save updated config
+$cfg | ConvertTo-Json -Depth 10 | Set-Content $configFile -Encoding UTF8
+Write-Host "Saved integration settings to $(Split-Path $configFile -Leaf)."
 
-# Restart Docker Desktop
-Write-Host "🔄 Restarting Docker Desktop..."
+:RestartDocker
+Write-Host "Restarting Docker Desktop..."
 Get-Process -Name 'Docker Desktop' -ErrorAction SilentlyContinue | Stop-Process -Force
 Start-Process -FilePath 'C:\Program Files\Docker\Docker\Docker Desktop.exe' -ErrorAction SilentlyContinue
