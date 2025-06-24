@@ -85,7 +85,11 @@ if (-not $Local) {
 Write-Decorated "Importing WSL distro '$DistroName' from '$TarballPath'"
 wsl --import $DistroName $InstallDir $TarballPath --version 2
 if ($LASTEXITCODE -eq 0) {
-    Write-Decorated "Done! You can now run: wsl -d $DistroName"
+
+    Write-Decorated "Almost done! Go to Docker Desktop: Settings > Resources > WSL Integration"
+    Write-Decorated "Toggle XVE on"
+    Write-Decorated "Click Apply & Restart right bottom button"
+    Write-Decorated "Finally after that's finished you can now run: wsl -d $DistroName"
 } else {
     Write-Decorated "WSL import failed with exit code $LASTEXITCODE"
     Pop-Location
