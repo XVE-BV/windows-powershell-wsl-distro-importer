@@ -1,6 +1,8 @@
 <#
 .SYNOPSIS
   Unregister (remove) a WSL2 distro by name and undo Docker Desktop WSL integration.
+.DESCRIPTION
+  Shuts down and unregisters the specified WSL distro, then removes it from Docker Desktop's WSL integration settings.
 .PARAMETER DistroName
   Name of the distro to unregister (default: XVE).
 #>
@@ -35,34 +37,48 @@ wsl --unregister $DistroName
 Write-Host "Distro '$DistroName' has been unregistered and removed."
 
 # --- Undo Docker Desktop WSL Integration ---
-# Path to Docker Desktop settings
-$settingsPath = Join-Path $Env:APPDATA "Docker\settings.json"
+# Attempt to locate Docker Desktop settings
+$roaming = Join-Path $Env:APPDATA 'Docker'
+$paths = @(
+    Join-Path $roaming 'settings.json',
+    Join-Path $roaming 'settings-store.json'
+)
+$settingsPath = $paths | Where-Object { Test-Path $_ } | Select-Object -First 1
+if (-not $settingsPath) {
+    Write-Warning "Docker Desktop settings not found at expected locations:`n  $($paths -join '`n  ')"
+    return
+}
 
-if (Test-Path $settingsPath) {
+# Load & parse settings
+Try {
     $json = Get-Content $settingsPath -Raw | ConvertFrom-Json
+} Catch {
+    Write-Warning "Failed to parse JSON from $settingsPath: $_"
+    return
+}
 
-    # Determine list key
-    if ($json.PSObject.Properties.Name -contains 'wslDistros') {
-        $listKey = 'wslDistros'
-    } elseif ($json.PSObject.Properties.Name -contains 'enabledWSLDistros') {
-        $listKey = 'enabledWSLDistros'
-    } else {
-        Write-Warning "Could not find WSL integration list in settings.json. Skipping removal."
-        exit 0
-    }
+# Determine list key for distros
+if ($json.PSObject.Properties.Name -contains 'wslDistros') {
+    $listKey = 'wslDistros'
+} elseif ($json.PSObject.Properties.Name -contains 'enabledWSLDistros') {
+    $listKey = 'enabledWSLDistros'
+} else {
+    Write-Warning "Could not find expected WSL-integration list key in $settingsPath"
+    return
+}
 
-    # Remove the distro from the list
-    $distros = @($json.$listKey) | Where-Object { $_ -ne $DistroName }
-    $json.$listKey = $distros
-
+# Remove distro if present
+$updated = @($json.$listKey) | Where-Object { $_ -ne $DistroName }
+if (@($json.$listKey).Count -eq $updated.Count) {
+    Write-Host "'$DistroName' was not in Docker Desktop WSL integration list."
+} else {
+    $json.$listKey = $updated
     # Save updated settings
     $json | ConvertTo-Json -Depth 10 | Set-Content $settingsPath -Encoding UTF8
-    Write-Host "✅ Removed '$DistroName' from Docker Desktop WSL integration list."
+    Write-Host "✅ Removed '$DistroName' from Docker Desktop WSL integration list in $([IO.Path]::GetFileName($settingsPath))."
 
     # Restart Docker Desktop to apply changes
     Write-Host "🔄 Restarting Docker Desktop..."
-    Get-Process -Name "Docker Desktop" -ErrorAction SilentlyContinue | Stop-Process -Force
-    Start-Process -FilePath "C:\Program Files\Docker\Docker\Docker Desktop.exe"
-} else {
-    Write-Warning "Docker Desktop settings.json not found. Cannot undo integration."
+    Get-Process -Name 'Docker Desktop' -ErrorAction SilentlyContinue | Stop-Process -Force
+    Start-Process -FilePath 'C:\Program Files\Docker\Docker\Docker Desktop.exe' -ErrorAction SilentlyContinue
 }
