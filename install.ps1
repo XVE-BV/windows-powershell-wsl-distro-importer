@@ -92,7 +92,6 @@ Pop-Location
 
 # --- Enable Docker Desktop WSL Integration for XVE ---
 $roaming = Join-Path $Env:APPDATA 'Docker'
-# Build array of possible settings file paths
 $paths = @(
     Join-Path $roaming 'settings.json';
     Join-Path $roaming 'settings-store.json'
@@ -118,8 +117,16 @@ try {
     }
 }
 
-# Enable integration
-$json.wslEngineEnabled = $true
+# Enable integration key if present
+if ($json.PSObject.Properties.Name -contains 'wslEngineEnabled') {
+    $json.wslEngineEnabled = $true
+    Write-Host "Set 'wslEngineEnabled' = true"
+} elseif ($json.PSObject.Properties.Name -contains 'wslEngineSettings') {
+    $json.wslEngineSettings.enabled = \$true
+    Write-Host "Set 'wslEngineSettings.enabled' = true"
+} else {
+    Write-Warning "WSL integration enable key not found in $settingsPath"
+}
 
 # Determine list key
 if ($json.PSObject.Properties.Name -contains 'wslDistros') {
@@ -131,7 +138,7 @@ if ($json.PSObject.Properties.Name -contains 'wslDistros') {
     return
 }
 
-# Add distro
+# Add distro to list
 $existing = @($json.$listKey)
 if ($existing -notcontains $DistroName) {
     $existing += $DistroName
