@@ -86,12 +86,13 @@ Write-Decorated "Importing WSL distro '$DistroName' from '$TarballPath'"
 wsl --import $DistroName $InstallDir $TarballPath --version 2
 if ($LASTEXITCODE -eq 0) {
 
-    Write-Decorated "Almost done! Go to Docker Desktop: Settings > Resources > WSL Integration"
-    Write-Decorated "Toggle XVE on"
-    Write-Decorated "Click Apply & Restart right bottom button"
-    Write-Decorated "Finally after that's finished you can now run: wsl -d $DistroName"
+    Write-Decorated "Almost done!"
+    Write-Host "Go to Docker Desktop: Settings > Resources > WSL Integration"
+    Write-Host "Toggle XVE on"
+    Write-Host "Click Apply & Restart right bottom button"
+    Write-Decorated "Finally after that's finished you can now run: wsl -d $DistroName" "Green"
 } else {
-    Write-Decorated "WSL import failed with exit code $LASTEXITCODE"
+    Write-Error "WSL import failed with exit code $LASTEXITCODE"
     Pop-Location
     exit 1
 }
