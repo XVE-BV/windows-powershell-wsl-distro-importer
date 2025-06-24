@@ -91,24 +91,28 @@ Write-Host "Distro '$DistroName' has been registered."
 Pop-Location
 
 # --- Enable Docker Desktop WSL Integration for XVE ---
-# Attempt to locate Docker Desktop settings
 $roaming = Join-Path $Env:APPDATA 'Docker'
-$paths = @(
-    Join-Path $roaming 'settings.json',
-    Join-Path $roaming 'settings-store.json'
-)
+$paths = @(Join-Path $roaming 'settings.json', Join-Path $roaming 'settings-store.json')
 $settingsPath = $paths | Where-Object { Test-Path $_ } | Select-Object -First 1
 if (-not $settingsPath) {
-    Write-Warning "Could not find Docker Desktop settings at expected locations:`n  $($paths -join '`n  ')"
+    Write-Warning "Docker Desktop settings not found at expected locations:`n  $($paths -join '`n  ')"
     return
 }
 
-# Load & parse settings
-Try {
-    $json = Get-Content $settingsPath -Raw | ConvertFrom-Json
-} Catch {
-    Write-Warning "Failed to parse JSON from $settingsPath: $_"
-    return
+# Load file and strip JSON comments
+try {
+    $raw = Get-Content $settingsPath -Raw
+    # remove // comments and /* */ blocks
+    $clean = $raw -replace '(?m)//.*$','' -replace '(?s)/\*.*?\*/',''
+    $json = $clean | ConvertFrom-Json
+} catch {
+    Write-Warning "Could not parse JSON from $settingsPath. Attempting lenient load."
+    try {
+        $json = Get-Content $settingsPath -Raw | ConvertFrom-Json -ErrorAction Stop
+    } catch {
+        Write-Warning "Failed to load settings JSON. Skipping integration enable."
+        return
+    }
 }
 
 # Ensure WSL integration is enabled globally
