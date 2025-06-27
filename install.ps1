@@ -47,7 +47,7 @@ Push-Location $scriptDir
 
 # Download from GitHub if not local
 if (-not $Local) {
-    $repo      = 'jonasvanderhaegen-xve/xve-artifacts'
+    $repo      = 'XVE-BV/xve-wsl-artifacts'
     $assetName = 'xve-distro.tar'
     Write-Decorated "Fetching latest release from GitHub repo '$repo'"
     $headers   = @{ 'User-Agent' = 'XVE-Importer' }
