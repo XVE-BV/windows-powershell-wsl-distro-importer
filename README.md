@@ -8,7 +8,7 @@
 
 ---
 
-<a href="https://github.com/users/jonasvanderhaegen-xve/projects/1">View Project Kanban Board</a>
+<a href="https://github.com/users/XVE-BV/projects/1">View Project Kanban Board</a>
 
 ---
 
